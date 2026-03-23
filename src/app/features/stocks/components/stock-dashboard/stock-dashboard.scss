@@ -1,0 +1,29 @@
+.dashboard {
+  &__loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 50vh;
+    font-size: 1.1rem;
+    color: var(--color-text-secondary);
+  }
+
+  &__grid {
+    display: grid;
+    gap: 1rem;
+    padding: 1.5rem;
+    grid-template-columns: 1fr;
+    max-width: 1200px;
+    margin: 0 auto;
+
+    @media (min-width: 480px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (min-width: 768px) {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.25rem;
+      padding: 2rem;
+    }
+  }
+}

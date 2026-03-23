@@ -1,0 +1,339 @@
+---
+description: Angular 21 architecture, component design, signals, zoneless, state management, RxJS, and best practices
+globs: "**/*.{ts,html}"
+alwaysApply: false
+---
+
+# Angular 21 Best Practices
+
+## Architecture
+
+- **Standalone components only** — NgModules are legacy; never use for new code
+- **Zoneless by default** — Zone.js is removed; signals drive change detection
+- **Signals are the primary mental model** — not optional; tooling and DevTools assume them
+- Feature-based folder structure with standalone routes
+- Smart (container) components handle data; dumb (presentational) components render via `input()`/`output()`
+- Keep components thin — delegate business logic to services
+- One service per domain concern (`StockPriceService`, `PortfolioService`)
+
+```
+src/app/
+  features/
+    stocks/
+      components/
+      services/
+      models/
+      stocks.routes.ts
+    portfolio/
+      ...
+  core/            # singleton services, guards, interceptors
+  shared/          # reusable components, pipes, directives
+```
+
+## Components
+
+### Signals (Default Mental Model)
+
+All signal APIs are stable: `signal()`, `computed()`, `effect()`, `linkedSignal()`, `toSignal()`.
+
+- Use **signals** for all component state — `BehaviorSubject` for UI state is a code smell
+- Use `input()`, `output()`, `model()` function APIs — **never** `@Input()`/`@Output()` decorators
+- Use `computed()` for derived values — never store what you can compute
+- Use `linkedSignal()` for writable signals that reset when a source changes
+
+```typescript
+@Component({ ... })
+export class StockCardComponent {
+  stock = input.required<Stock>();
+  priceChange = computed(() => this.stock().currentPrice - this.stock().openPrice);
+  select = output<string>();
+}
+```
+
+### linkedSignal
+
+Writable signal that auto-resets when a source signal changes — replaces manual `effect()` + `set()` patterns:
+
+```typescript
+selectedSymbol = input.required<string>();
+quantity = linkedSignal({
+  source: this.selectedSymbol,
+  computation: () => 1,
+});
+```
+
+### model() — Two-Way Binding
+
+`model()` replaces the `@Input() + @Output()` two-way binding pattern:
+
+```typescript
+// Child component
+checked = model.required<boolean>();
+
+toggle() {
+  this.checked.set(!this.checked());
+}
+
+// Parent template
+<app-toggle [(checked)]="isActive" />
+```
+
+### Signal Queries
+
+Use function-based queries — **never** `@ViewChild()`/`@ContentChild()` decorators:
+
+```typescript
+chart = viewChild.required<StockChartComponent>('chart');
+items = viewChildren(StockRowComponent);
+
+resetChart() {
+  this.chart().reset();
+}
+```
+
+### Change Detection — Zoneless by Default
+
+Angular 21 removed Zone.js from the default bootstrap. New projects are zoneless out of the box:
+
+```typescript
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideZonelessChangeDetection(),
+    // ...
+  ]
+});
+```
+
+- Components re-render only when: signals change, template events fire, or `markForCheck()` is called
+- No global async patching — ~33KB bundle reduction, 30-40% rendering improvement
+- `OnPush` is the standard (aliased as `ChangeDetectionStrategy.Eager` for `Default`)
+- Avoid mutating objects/arrays — always create new references
+- Replace any `NgZone` usage with `afterNextRender()` / `afterEveryRender()`
+
+### Templates
+
+- Use `@if`, `@for`, `@switch` built-in control flow — **never** `*ngIf`, `*ngFor`, `*ngSwitch`
+- `track` is mandatory in `@for` to avoid DOM thrashing
+- `@defer` for lazy-loading heavy components
+- `@switch` supports exhaustive checks (Angular 21.2)
+- `instanceof` operator supported in templates (Angular 21.2)
+- Arrow functions supported in template expressions (Angular 21.2)
+- Keep templates lean — move logic to `computed()` or pipes
+
+```html
+@for (stock of stocks(); track stock.symbol) {
+  <app-stock-card [stock]="stock" (select)="onSelect($event)" />
+}
+
+@defer (on viewport) {
+  <app-stock-chart [data]="chartData()" />
+} @placeholder {
+  <div class="chart-skeleton"></div>
+}
+```
+
+### Component Communication
+
+| Direction | Method |
+|---|---|
+| Parent → Child | `input()` / `input.required()` |
+| Child → Parent | `output()` |
+| Two-way binding | `model()` with `[( )]` syntax |
+| Siblings | Shared service with signals |
+| Deep nesting | Service at appropriate injector level, or signal store |
+
+## Services & Dependency Injection
+
+- Use `inject()` function — **not** constructor injection
+- Services are `@Injectable({ providedIn: 'root' })` for singletons
+- Scope services at feature level when they shouldn't be global
+- Services own business logic and data access — components orchestrate UI
+
+## Resource API
+
+Use `resource()` / `rxResource()` / `httpResource()` for reactive async data loading — replaces manual `subscribe` + loading/error state management. Compose resources via `ResourceSnapshot` for dependent queries.
+
+```typescript
+@Component({ ... })
+export class StockDetailComponent {
+  symbol = input.required<string>();
+
+  stockPrice = httpResource<StockPrice>(() => ({
+    url: `/api/stocks/${this.symbol()}/price`,
+  }));
+
+  // Access: stockPrice.value(), stockPrice.status(), stockPrice.error()
+}
+```
+
+For RxJS-based streams (`params`/`stream` API):
+
+```typescript
+priceHistory = rxResource<PriceHistory[], string>({
+  params: () => this.symbol(),
+  stream: ({ params, abortSignal }) =>
+    this.http.get<PriceHistory[]>(`/api/stocks/${params}/history`, { signal: abortSignal }),
+});
+```
+
+Resource status: `'idle' | 'loading' | 'reloading' | 'resolved' | 'error'`
+
+## Signal Forms (Experimental)
+
+Angular 21 introduces experimental Signal Forms — a signal-native replacement for Reactive Forms. Use for **non-production** or **new greenfield** forms where you accept API instability.
+
+```typescript
+import { form, FormField, required, email } from '@angular/forms/signals';
+
+loginModel = signal<LoginData>({ email: '', password: '' });
+
+loginForm = form(this.loginModel, (fieldPath) => {
+  required(fieldPath.email, { message: 'Email is required' });
+  email(fieldPath.email, { message: 'Enter a valid email' });
+  required(fieldPath.password, { message: 'Password is required' });
+});
+```
+
+```html
+<input [formField]="loginForm.controls.email" />
+```
+
+- Define a signal model, wrap with `form()`, bind with `[formField]`
+- Schema-based validation as second argument to `form()`
+- No `ControlValueAccessor` needed for custom controls
+- **For production forms, continue using typed Reactive Forms** until Signal Forms stabilizes
+
+## RxJS
+
+- Reserve RxJS for **async streams**: WebSocket, real-time event coordination, complex orchestration
+- For HTTP, prefer `httpResource()` / `rxResource()` over manual RxJS
+- When using observables, prefer `toSignal()` over manual `.subscribe()` or `async` pipe
+- If you must subscribe, unsubscribe via `takeUntilDestroyed()` or `DestroyRef`
+- Avoid nested subscribes — use `switchMap`, `mergeMap`, `concatMap`, `exhaustMap`
+- Use `shareReplay({ bufferSize: 1, refCount: true })` for multicasted streams
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class StockStreamService {
+  connectToLivePrices(symbols: string[]): Observable<PriceUpdate> {
+    return webSocket<PriceUpdate>(`wss://api.example.com/prices`).pipe(
+      filter(update => symbols.includes(update.symbol)),
+      retry({ count: 3, delay: 1000 }),
+      shareReplay({ bufferSize: 1, refCount: true })
+    );
+  }
+}
+```
+
+## State Management
+
+| Complexity | Tool |
+|---|---|
+| Component-local | `signal()`, `computed()`, `linkedSignal()` |
+| Async data | `httpResource()`, `rxResource()`, `resource()` |
+| Shared feature state | Service with signals |
+| Complex global state | NgRx SignalStore |
+
+### NgRx SignalStore
+
+```typescript
+export const StockStore = signalStore(
+  withState<StockState>({ stocks: [], loading: false, error: null }),
+  withComputed(({ stocks }) => ({
+    activeStocks: computed(() => stocks().filter(s => s.status === 'active')),
+  })),
+  withMethods((store, stockService = inject(StockPriceService)) => ({
+    loadStocks: rxMethod<void>(
+      pipe(
+        tap(() => patchState(store, { loading: true })),
+        switchMap(() => stockService.getAll()),
+        tap(stocks => patchState(store, { stocks, loading: false }))
+      )
+    ),
+  }))
+);
+```
+
+## Routing
+
+- Lazy load feature routes for smaller initial bundle
+- Use functional guards and resolvers
+- Preload visible routes (`PreloadAllModules` or custom strategy)
+
+```typescript
+export const routes: Routes = [
+  {
+    path: 'stocks',
+    loadChildren: () => import('./features/stocks/stocks.routes').then(m => m.STOCK_ROUTES),
+    canActivate: [authGuard],
+  },
+];
+```
+
+## Forms (Production)
+
+- **Typed Reactive Forms** (`FormGroup<T>`) for complex validation, dynamic fields, cross-field logic
+- **Template-driven** only for trivial cases (search bar)
+- Custom validators as pure functions; async validators for server-side checks
+- Signal Forms (experimental) for greenfield exploration only
+
+## HTTP & Interceptors
+
+- For simple requests, prefer `httpResource()` — automatic loading/error/caching
+- For complex flows, centralize API calls in services with `HttpClient`
+- Use functional interceptors for auth tokens, error handling, logging
+- Use `withFetch()` in `provideHttpClient()` for modern fetch-based transport
+
+```typescript
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const token = inject(AuthService).getToken();
+  const authReq = token
+    ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+    : req;
+  return next(authReq);
+};
+```
+
+## Angular Aria (Developer Preview)
+
+- Headless, accessible-first components you can fully style
+- Use for custom UI where Angular Material is too opinionated
+- Built with accessibility as a priority — ARIA attributes handled automatically
+
+## Testing
+
+- Unit test services with `TestBed` or plain instantiation
+- Component tests with `ComponentFixture` — test inputs, outputs, and DOM behavior
+- Use `provideHttpClientTesting()` for HTTP tests (not `HttpClientTestingModule`)
+- Use `fakeAsync` + `tick` for time-dependent tests
+- Prefer `harness` from Angular CDK for testing Material components
+- **Vitest** supported as unit-test runner (Angular 21.2) alongside Karma/Jest
+- E2E with Playwright or Cypress for critical user journeys
+
+## Performance
+
+- Zoneless change detection — default and most performant (~33KB less, 30-40% faster renders)
+- Lazy load routes and heavy components with `@defer`
+- `@defer (on viewport)` for below-the-fold content
+- `track` expression in every `@for` block
+- Avoid expensive work in templates — use `computed()` or pipes
+- Bundle analysis with `source-map-explorer`
+- Use Web Workers for CPU-heavy computation (e.g., real-time chart calculations)
+- Nested animations support (Angular 21.2)
+
+## Accessibility
+
+- Semantic HTML first (`<button>`, `<nav>`, `<main>`, `<label>`)
+- Consider **Angular Aria** headless components for custom accessible UI
+- `aria-*` attributes only when native semantics aren't enough
+- Keyboard navigation for all interactive elements
+- Use Angular CDK `a11y` module (focus trap, live announcer)
+- Lint with `angular-eslint` and test with screen reader
+
+## TypeScript
+
+- **TypeScript 6** supported (Angular 21.2)
+- `strict: true` — never relax it
+- Avoid `any`; use `unknown` + type guards
+- Discriminated unions for multi-shape state
+- Use `instanceof` in templates for type narrowing (Angular 21.2)

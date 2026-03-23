@@ -1,0 +1,90 @@
+---
+description: TypeScript coding standards — strict typing, error handling, naming, and patterns
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+# TypeScript Standards
+
+## Strict Mode
+
+- `strict: true` in `tsconfig.json` — never relax it
+- Avoid `any`; use `unknown` + type guards when the type is truly unknown
+- Enable `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noUncheckedIndexedAccess`
+
+## Types & Interfaces
+
+- Use `interface` for public API contracts and object shapes
+- Use `type` for unions, intersections, mapped types, and aliases
+- Export types from a dedicated `models/` or `types/` directory per feature
+- Prefer discriminated unions over optional fields for multi-shape state:
+
+```typescript
+type AsyncState<T> =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: Error };
+```
+
+## Generics
+
+- Use generics for reusable utilities, services, and data structures
+- Name type params descriptively when meaning isn't obvious: `TItem`, `TResponse`
+- Constrain with `extends` to enforce shape requirements
+
+## Enums & Constants
+
+- Prefer `const` objects or string literal unions over `enum` unless you need reverse mapping
+- Use `as const` for immutable literal objects
+
+```typescript
+const STOCK_STATUS = {
+  ACTIVE: 'active',
+  HALTED: 'halted',
+  DELISTED: 'delisted',
+} as const;
+
+type StockStatus = typeof STOCK_STATUS[keyof typeof STOCK_STATUS];
+```
+
+## Error Handling
+
+- Use typed custom errors with context:
+
+```typescript
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly endpoint: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+```
+
+- Fail fast with guard clauses
+- Always provide actionable error messages
+- Never use empty `catch {}` blocks
+
+## Nullability
+
+- Prefer explicit `null` checks over non-null assertions (`!`)
+- Use optional chaining (`?.`) and nullish coalescing (`??`) for safe access
+- Avoid `!` operator — if a value can be null, handle it
+
+## Naming
+
+- Interfaces: `PascalCase` (no `I` prefix) — `StockQuote`, `PortfolioSummary`
+- Types: `PascalCase` — `TradeAction`, `PriceUpdate`
+- Functions/methods: `camelCase` verb + noun — `calculateReturn`, `fetchQuote`
+- Constants: `UPPER_SNAKE_CASE` — `MAX_RETRY_COUNT`, `WS_RECONNECT_DELAY`
+- Files: `kebab-case` — `stock-price.service.ts`, `portfolio.model.ts`
+
+## Imports
+
+- Use path aliases (`@app/`, `@features/`) over deep relative paths
+- Barrel exports (`index.ts`) per feature for clean imports
+- No circular dependencies — lint with `eslint-plugin-import`

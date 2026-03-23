@@ -1,0 +1,35 @@
+<div class="card" [appPriceDirection]="direction()">
+  <app-stock-card-header [symbol]="stock().symbol" [name]="stock().name" />
+
+  <app-stock-price-change
+    [currentPrice]="stock().currentPrice"
+    [change]="stock().change"
+    [changePercent]="stock().changePercent"
+  />
+
+  <div class="card__details">
+    <app-stock-details-row label="High" [value]="stock().dailyHigh" />
+    <app-stock-details-row label="Low" [value]="stock().dailyLow" />
+  </div>
+
+  <div class="card__details card__details--52week">
+    <app-stock-details-row label="52W High" [value]="stock().week52High" />
+    <app-stock-details-row label="52W Low" [value]="stock().week52Low" />
+  </div>
+
+  <div class="card__trade">
+    <span class="card__trade-label">Last Trade</span>
+    <span class="card__trade-time">{{ stock().lastTradeTime | date:'h:mm:ssa' }}</span>
+  </div>
+
+  <div class="card__volume">
+    VOL: {{ stock().volume | number }}
+  </div>
+
+  <div class="card__toggle">
+    <app-stock-toggle
+      [active]="stock().isActive"
+      (activeChange)="onToggle()"
+    />
+  </div>
+</div>

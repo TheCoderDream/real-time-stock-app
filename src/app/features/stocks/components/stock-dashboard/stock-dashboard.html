@@ -1,0 +1,14 @@
+@if (isLoading()) {
+  <div class="dashboard__loading">
+    <p>Loading stock data...</p>
+  </div>
+} @else {
+  <div class="dashboard__grid">
+    @for (stock of stocks(); track stock.symbol) {
+      <app-stock-card
+        [stock]="stock"
+        (toggleChanged)="onToggle($event)"
+      />
+    }
+  </div>
+}

@@ -1,0 +1,73 @@
+---
+description: Core software development principles — SOLID, DRY, KISS, YAGNI, clean code, design patterns, testing, security, and version control
+alwaysApply: true
+---
+
+# General Software Development Principles
+
+## SOLID
+
+| Principle | Rule |
+|---|---|
+| **SRP** | One module/function = one reason to change. If the name needs "and", split it. |
+| **OCP** | Extend via composition and new modules — don't edit working code to add behavior. |
+| **LSP** | Replacements must honor the same interface/behavior contract. |
+| **ISP** | Small, focused interfaces — no "god" classes or mega-interfaces. |
+| **DIP** | Depend on abstractions (interfaces, types), not concrete implementations. |
+
+## Core Acronyms
+
+- **DRY** — Centralize shared logic. Duplication breeds bugs.
+- **KISS** — Simplest design that works. No unnecessary abstractions.
+- **YAGNI** — Don't build it until you need it.
+
+## Clean Code
+
+- Names reveal intent: `getUserById`, `isValidEmail`, `StockPriceChart`
+- Booleans: `is`, `has`, `should` prefix
+- Functions: verb + noun (`fetchUser`, `validateEmail`)
+- Constants: `UPPER_SNAKE_CASE`
+- Functions are small, single-purpose, 3 or fewer params (use options object beyond that)
+- Minimal nesting — use early returns and guard clauses
+- Comments explain **why**, not **what**. Never commit commented-out code.
+- Handle errors at a sensible layer; never swallow silently; use typed errors
+
+## Design Patterns
+
+- **Composition over inheritance** — build from small parts
+- **Strategy / Factory** — choose behavior via config, not big `if/else` chains
+- **Observer / Pub-Sub** — for decoupled event-driven updates
+
+## Testing
+
+- **Pyramid**: many unit → fewer integration → few E2E
+- Test behavior and outcomes, not implementation details
+- Deterministic: mock time, randomness, I/O
+- No network calls in unit tests
+
+## Security
+
+- Validate and sanitize all input
+- Parameterized queries for data layers
+- Secure auth (tokens, HTTPS, HttpOnly cookies)
+- Principle of least privilege
+
+## Performance
+
+- Measure before optimizing — profiler, Lighthouse, bundle analysis
+- Cache when appropriate (HTTP, memoization, query caching)
+- Pagination and virtualization for large data sets
+- Lazy loading for routes and heavy modules
+
+## Version Control
+
+- One logical change per commit
+- Message: `type(scope): summary` — types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+- Short-lived branches; merge/rebase often; delete after merge
+
+## Project Structure
+
+- Group by feature: `features/stocks/`, `features/portfolio/`
+- Shared code in top-level `components/`, `services/`, `utils/`, `models/`
+- One main class/component per file
+- Tests co-located next to the code they test
