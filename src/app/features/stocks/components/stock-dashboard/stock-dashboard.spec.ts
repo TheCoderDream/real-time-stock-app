@@ -32,18 +32,18 @@ describe('StockDashboard', () => {
     fixture.detectChanges();
   });
 
-  it('shows the loading indicator when isLoading is true', () => {
+  it('shows 12 skeleton cards when isLoading is true', () => {
     stateService.isLoading.set(true);
     fixture.detectChanges();
-    const loadingEl = fixture.nativeElement.querySelector('.dashboard__loading');
-    expect(loadingEl).toBeTruthy();
+    const skeletons = fixture.nativeElement.querySelectorAll('app-stock-card-skeleton');
+    expect(skeletons.length).toBe(12);
   });
 
-  it('hides the loading indicator when isLoading is false', () => {
+  it('hides skeleton cards when isLoading is false', () => {
     stateService.isLoading.set(false);
     fixture.detectChanges();
-    const loadingEl = fixture.nativeElement.querySelector('.dashboard__loading');
-    expect(loadingEl).toBeNull();
+    const skeletons = fixture.nativeElement.querySelectorAll('app-stock-card-skeleton');
+    expect(skeletons.length).toBe(0);
   });
 
   it('renders one stock-card per stock in the stocks signal', () => {
@@ -53,7 +53,7 @@ describe('StockDashboard', () => {
     expect(cards.length).toBe(stateService.stocks().length);
   });
 
-  it('renders no cards while loading', () => {
+  it('renders no stock-cards while loading', () => {
     stateService.isLoading.set(true);
     fixture.detectChanges();
     const cards = fixture.nativeElement.querySelectorAll('app-stock-card');

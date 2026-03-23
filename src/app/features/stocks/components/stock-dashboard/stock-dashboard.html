@@ -1,6 +1,8 @@
 @if (isLoading()) {
-  <div class="dashboard__loading">
-    <p>Loading stock data...</p>
+  <div class="dashboard__grid">
+    @for (_ of skeletons; track $index) {
+      <app-stock-card-skeleton />
+    }
   </div>
 } @else {
   <div class="dashboard__grid">

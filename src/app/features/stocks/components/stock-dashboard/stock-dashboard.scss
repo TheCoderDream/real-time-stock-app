@@ -1,13 +1,4 @@
 .dashboard {
-  &__loading {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 50vh;
-    font-size: 1.1rem;
-    color: var(--color-text-secondary);
-  }
-
   &__grid {
     display: grid;
     gap: 1rem;
