@@ -2,6 +2,8 @@
 
 A real-time stock price dashboard built with **Angular 21**. Tracks 4 stocks (Apple, Alphabet, Microsoft, Tesla) with live price updates, on/off toggle per card, color-coded status, and a responsive CSS Grid layout.
 
+**Live demo:** [https://real-time-stock.netlify.app](https://real-time-stock.netlify.app)
+
 ---
 
 ## Prerequisites
