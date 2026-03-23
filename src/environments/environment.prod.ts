@@ -2,7 +2,7 @@ export const environment = {
   production: true,
   useMock: false,
   finnhub: {
-    apiKey: 'YOUR_FINNHUB_API_KEY',
+    apiKey: 'd70igapr01quoska08kgd70igapr01quoska08l0',
     wsUrl: 'wss://ws.finnhub.io',
     restUrl: 'https://finnhub.io/api/v1',
   },
