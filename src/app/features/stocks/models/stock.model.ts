@@ -52,6 +52,11 @@ export interface FinnhubWsMessage {
   }>;
 }
 
+export interface FinnhubWsOutboundMessage {
+  type: 'subscribe' | 'unsubscribe';
+  symbol: string;
+}
+
 export interface StockConfig {
   symbol: string;
   name: string;

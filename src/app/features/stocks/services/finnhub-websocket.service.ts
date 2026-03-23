@@ -1,75 +1,80 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   Observable,
-  Subject,
   retry,
   share,
   filter,
   mergeMap,
   from,
-  EMPTY,
-  tap,
-  finalize,
 } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-import { StockPriceUpdate, FinnhubWsMessage } from '../models/stock.model';
+import {
+  StockPriceUpdate,
+  FinnhubWsMessage,
+  FinnhubWsOutboundMessage,
+} from '../models/stock.model';
 import { TRACKED_STOCKS } from '../stocks.config';
 import { environment } from '@env';
+
+type FinnhubTradeEntry = NonNullable<FinnhubWsMessage['data']>[number];
+type FinnhubTradeMessage = FinnhubWsMessage & { data: NonNullable<FinnhubWsMessage['data']> };
 
 @Injectable({ providedIn: 'root' })
 export class FinnhubWebSocketService implements OnDestroy {
   readonly prices$: Observable<StockPriceUpdate>;
 
-  private socket$: WebSocketSubject<FinnhubWsMessage> | null = null;
-  private readonly destroy$ = new Subject<void>();
+  private socket$: WebSocketSubject<FinnhubWsMessage | FinnhubWsOutboundMessage> | null = null;
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
     this.prices$ = this.createFinnhubStream();
   }
 
   ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
+    this.unsubscribeFromAllStocks();
     this.socket$?.complete();
   }
 
   private createFinnhubStream(): Observable<StockPriceUpdate> {
     const url = `${environment.finnhub.wsUrl}?token=${environment.finnhub.apiKey}`;
 
-    this.socket$ = webSocket<FinnhubWsMessage>({
+    this.socket$ = webSocket<FinnhubWsMessage | FinnhubWsOutboundMessage>({
       url,
-      openObserver: {
-        next: () => {
-          TRACKED_STOCKS.forEach((stock) => {
-            this.socket$?.next({ type: 'subscribe', symbol: stock.symbol } as any);
-          });
-        },
-      },
+      openObserver: { next: () => this.subscribeToAllStocks() },
     });
 
     return this.socket$.pipe(
-      filter((msg): msg is FinnhubWsMessage & { data: NonNullable<FinnhubWsMessage['data']> } =>
-        msg.type === 'trade' && Array.isArray(msg.data) && msg.data.length > 0
+      filter((msg): msg is FinnhubTradeMessage =>
+        msg.type === 'trade' &&
+        Array.isArray((msg as FinnhubWsMessage).data) &&
+        ((msg as FinnhubWsMessage).data as NonNullable<FinnhubWsMessage['data']>).length > 0
       ),
-      mergeMap((msg) =>
-        from(
-          msg.data.map(
-            (trade): StockPriceUpdate => ({
-              symbol: trade.s,
-              price: trade.p,
-              volume: trade.v,
-              timestamp: trade.t,
-            })
-          )
-        )
-      ),
+      mergeMap((msg) => from(msg.data.map(FinnhubWebSocketService.mapTradeToUpdate))),
       retry({ count: 5, delay: 3000 }),
+      takeUntilDestroyed(this.destroyRef),
       share(),
-      finalize(() => {
-        TRACKED_STOCKS.forEach((stock) => {
-          this.socket$?.next({ type: 'unsubscribe', symbol: stock.symbol } as any);
-        });
-      })
     );
+  }
+
+  private subscribeToAllStocks(): void {
+    TRACKED_STOCKS.forEach((stock) =>
+      this.socket$?.next({ type: 'subscribe', symbol: stock.symbol })
+    );
+  }
+
+  private unsubscribeFromAllStocks(): void {
+    TRACKED_STOCKS.forEach((stock) =>
+      this.socket$?.next({ type: 'unsubscribe', symbol: stock.symbol })
+    );
+  }
+
+  private static mapTradeToUpdate(trade: FinnhubTradeEntry): StockPriceUpdate {
+    return {
+      symbol: trade.s,
+      price: trade.p,
+      volume: trade.v,
+      timestamp: trade.t,
+    };
   }
 }
