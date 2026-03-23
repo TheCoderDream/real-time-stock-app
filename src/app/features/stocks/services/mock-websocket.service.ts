@@ -14,6 +14,14 @@ const BASE_PRICES: Record<string, number> = {
   GOOGL: 175.0,
   MSFT: 420.0,
   TSLA: 250.0,
+  AMZN: 195.0,
+  META: 510.0,
+  NVDA: 875.0,
+  NFLX: 630.0,
+  AMD: 165.0,
+  ORCL: 140.0,
+  INTC: 30.0,
+  CRM: 285.0,
 };
 
 @Injectable({ providedIn: 'root' })

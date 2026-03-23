@@ -7,6 +7,14 @@ export const TRACKED_STOCKS: StockConfig[] = [
   { symbol: 'GOOGL', name: 'Alphabet' },
   { symbol: 'MSFT', name: 'Microsoft' },
   { symbol: 'TSLA', name: 'Tesla' },
+  { symbol: 'AMZN', name: 'Amazon' },
+  { symbol: 'META', name: 'Meta' },
+  { symbol: 'NVDA', name: 'Nvidia' },
+  { symbol: 'NFLX', name: 'Netflix' },
+  { symbol: 'AMD', name: 'AMD' },
+  { symbol: 'ORCL', name: 'Oracle' },
+  { symbol: 'INTC', name: 'Intel' },
+  { symbol: 'CRM', name: 'Salesforce' },
 ];
 
 export const STOCK_PRICE_STREAM = new InjectionToken<Observable<StockPriceUpdate>>(

@@ -29,8 +29,8 @@ describe('StockStateService', () => {
   });
 
   describe('initialization (mock mode)', () => {
-    it('seeds four stocks by default', () => {
-      expect(service.stocks().length).toBe(4);
+    it('seeds twelve stocks by default', () => {
+      expect(service.stocks().length).toBe(12);
     });
 
     it('sets isLoading to false after seeding', () => {
