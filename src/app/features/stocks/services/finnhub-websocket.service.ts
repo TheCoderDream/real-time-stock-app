@@ -1,27 +1,14 @@
-import { Injectable, OnDestroy, DestroyRef, inject } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  Observable,
-  retry,
-  share,
-  filter,
-  mergeMap,
-  from,
-} from 'rxjs';
+import { Injectable, DestroyRef, inject } from '@angular/core';
+import { Observable } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-import {
-  StockPriceUpdate,
-  FinnhubWsMessage,
-  FinnhubWsOutboundMessage,
-} from '../models/stock.model';
+import { StockPriceUpdate, FinnhubWsMessage, FinnhubWsOutboundMessage } from '../models/stock.model';
 import { TRACKED_STOCKS } from '../stocks.config';
 import { environment } from '@env';
-
-type FinnhubTradeEntry = NonNullable<FinnhubWsMessage['data']>[number];
-type FinnhubTradeMessage = FinnhubWsMessage & { data: NonNullable<FinnhubWsMessage['data']> };
+import { resilientStream } from '@shared/operators/resilient-stream.operator';
+import { isTradeMessage, mapTradeToUpdate, FinnhubTradeMessage } from '../utils/finnhub.utils';
 
 @Injectable({ providedIn: 'root' })
-export class FinnhubWebSocketService implements OnDestroy {
+export class FinnhubWebSocketService {
   readonly prices$: Observable<StockPriceUpdate>;
 
   private socket$: WebSocketSubject<FinnhubWsMessage | FinnhubWsOutboundMessage> | null = null;
@@ -29,11 +16,10 @@ export class FinnhubWebSocketService implements OnDestroy {
 
   constructor() {
     this.prices$ = this.createFinnhubStream();
-  }
-
-  ngOnDestroy(): void {
-    this.unsubscribeFromAllStocks();
-    this.socket$?.complete();
+    this.destroyRef.onDestroy(() => {
+      this.unsubscribeFromAllStocks();
+      this.socket$?.complete();
+    });
   }
 
   private createFinnhubStream(): Observable<StockPriceUpdate> {
@@ -45,15 +31,12 @@ export class FinnhubWebSocketService implements OnDestroy {
     });
 
     return this.socket$.pipe(
-      filter((msg): msg is FinnhubTradeMessage =>
-        msg.type === 'trade' &&
-        Array.isArray((msg as FinnhubWsMessage).data) &&
-        ((msg as FinnhubWsMessage).data as NonNullable<FinnhubWsMessage['data']>).length > 0
-      ),
-      mergeMap((msg) => from(msg.data.map(FinnhubWebSocketService.mapTradeToUpdate))),
-      retry({ count: 5, delay: 3000 }),
-      takeUntilDestroyed(this.destroyRef),
-      share(),
+      resilientStream<FinnhubWsMessage | FinnhubWsOutboundMessage, FinnhubTradeMessage, StockPriceUpdate>({
+        filter: isTradeMessage,
+        project: (msg) => msg.data.map(mapTradeToUpdate),
+        retry: { count: 5, delay: 3000 },
+        destroyRef: this.destroyRef,
+      })
     );
   }
 
@@ -67,14 +50,5 @@ export class FinnhubWebSocketService implements OnDestroy {
     TRACKED_STOCKS.forEach((stock) =>
       this.socket$?.next({ type: 'unsubscribe', symbol: stock.symbol })
     );
-  }
-
-  private static mapTradeToUpdate(trade: FinnhubTradeEntry): StockPriceUpdate {
-    return {
-      symbol: trade.s,
-      price: trade.p,
-      volume: trade.v,
-      timestamp: trade.t,
-    };
   }
 }
