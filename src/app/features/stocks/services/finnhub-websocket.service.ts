@@ -2,13 +2,14 @@ import { Injectable, DestroyRef, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { StockPriceUpdate, FinnhubWsMessage, FinnhubWsOutboundMessage } from '../models/stock.model';
-import { TRACKED_STOCKS } from '../stocks.config';
+import { IStockPriceService, TRACKED_STOCKS } from '../stocks.config';
 import { environment } from '@env';
 import { resilientStream } from '@shared/operators/resilient-stream.operator';
 import { isTradeMessage, mapTradeToUpdate, FinnhubTradeMessage } from '../utils/finnhub.utils';
+import { resolveActiveStates } from '../utils/active-states.utils';
 
 @Injectable({ providedIn: 'root' })
-export class FinnhubWebSocketService {
+export class FinnhubWebSocketService implements IStockPriceService {
   readonly prices$: Observable<StockPriceUpdate>;
 
   private socket$: WebSocketSubject<FinnhubWsMessage | FinnhubWsOutboundMessage> | null = null;
@@ -40,15 +41,21 @@ export class FinnhubWebSocketService {
     );
   }
 
+  notifyToggle(symbol: string, active: boolean): void {
+    this.socket$?.next({ type: active ? 'subscribe' : 'unsubscribe', symbol });
+  }
+
   private subscribeToAllStocks(): void {
-    TRACKED_STOCKS.forEach((stock) =>
-      this.socket$?.next({ type: 'subscribe', symbol: stock.symbol })
-    );
+    const activeStates = resolveActiveStates(TRACKED_STOCKS.map((s) => s.symbol));
+    TRACKED_STOCKS
+      .filter((stock) => activeStates[stock.symbol] ?? true)
+      .forEach((stock) => this.socket$?.next({ type: 'subscribe', symbol: stock.symbol }));
   }
 
   private unsubscribeFromAllStocks(): void {
-    TRACKED_STOCKS.forEach((stock) =>
-      this.socket$?.next({ type: 'unsubscribe', symbol: stock.symbol })
-    );
+    const activeStates = resolveActiveStates(TRACKED_STOCKS.map((s) => s.symbol));
+    TRACKED_STOCKS
+      .filter((stock) => activeStates[stock.symbol] ?? true)
+      .forEach((stock) => this.socket$?.next({ type: 'unsubscribe', symbol: stock.symbol }));
   }
 }

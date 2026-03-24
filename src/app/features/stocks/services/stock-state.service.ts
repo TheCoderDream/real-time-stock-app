@@ -1,15 +1,18 @@
-import { Injectable, inject, signal, computed, effect, DestroyRef } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { Injectable, inject, signal, computed, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, EMPTY } from 'rxjs';
-import { StockData, StockPriceUpdate, PriceDirection } from '../models/stock.model';
-import { STOCK_PRICE_STREAM, TRACKED_STOCKS } from '../stocks.config';
+import { StockData, StockPriceUpdate } from '../models/stock.model';
+import { IStockPriceService, STOCK_PRICE_STREAM, TRACKED_STOCKS } from '../stocks.config';
 import { StockApiService } from './stock-api.service';
+import { resolveActiveStates, persistActiveStates } from '../utils/active-states.utils';
 import { environment } from '@env';
+
+const TRACKED_SYMBOLS = TRACKED_STOCKS.map((s) => s.symbol);
 
 @Injectable({ providedIn: 'root' })
 export class StockStateService {
   private readonly stockApi = inject(StockApiService);
-  private readonly priceStream$ = inject(STOCK_PRICE_STREAM);
+  private readonly priceService: IStockPriceService = inject(STOCK_PRICE_STREAM);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly stockMap = signal<Record<string, StockData>>({});
@@ -30,10 +33,12 @@ export class StockStateService {
     this.stockMap.update((map) => {
       const stock = map[symbol];
       if (!stock) return map;
-      return {
-        ...map,
-        [symbol]: { ...stock, isActive: !stock.isActive },
-      };
+
+      const newActive = !stock.isActive;
+      this.priceService.notifyToggle(symbol, newActive);
+      const newMap = { ...map, [symbol]: { ...stock, isActive: newActive } };
+      persistActiveStates(Object.fromEntries(Object.entries(newMap).map(([sym, s]) => [sym, s.isActive])));
+      return newMap;
     });
   }
 
@@ -53,8 +58,9 @@ export class StockStateService {
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe((stocks) => {
+        const activeStates = resolveActiveStates(TRACKED_SYMBOLS);
         const map: Record<string, StockData> = {};
-        stocks.forEach((s) => (map[s.symbol] = s));
+        stocks.forEach((s) => (map[s.symbol] = { ...s, isActive: activeStates[s.symbol] ?? true }));
         this.stockMap.set(map);
         this.isLoading.set(false);
       });
@@ -76,6 +82,7 @@ export class StockStateService {
       CRM: 285.0,
     };
 
+    const activeStates = resolveActiveStates(TRACKED_SYMBOLS);
     const map: Record<string, StockData> = {};
     TRACKED_STOCKS.forEach((s) => {
       const price = basePrices[s.symbol] ?? 100;
@@ -92,7 +99,7 @@ export class StockStateService {
         changePercent: 1.0,
         lastTradeTime: Date.now(),
         volume: Math.floor(Math.random() * 10000) + 1000,
-        isActive: true,
+        isActive: activeStates[s.symbol] ?? true,
       };
     });
 
@@ -101,7 +108,7 @@ export class StockStateService {
   }
 
   private subscribeToPriceStream(): void {
-    this.priceStream$
+    this.priceService.prices$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((update) => this.applyPriceUpdate(update));
   }

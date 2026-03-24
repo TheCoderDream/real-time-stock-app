@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
-import { Observable, interval, map, scan, share, switchMap, of, delay } from 'rxjs';
+import { Observable, interval, map, share } from 'rxjs';
 import { StockPriceUpdate } from '../models/stock.model';
-import { TRACKED_STOCKS } from '../stocks.config';
+import { IStockPriceService, TRACKED_STOCKS } from '../stocks.config';
 
 interface MockStockState {
   symbol: string;
@@ -25,12 +25,15 @@ const BASE_PRICES: Record<string, number> = {
 };
 
 @Injectable({ providedIn: 'root' })
-export class MockWebSocketService {
+export class MockWebSocketService implements IStockPriceService {
   readonly prices$: Observable<StockPriceUpdate>;
 
   constructor() {
     this.prices$ = this.createMockStream();
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  notifyToggle(_symbol: string, _active: boolean): void {}
 
   private createMockStream(): Observable<StockPriceUpdate> {
     const states = new Map<string, MockStockState>(

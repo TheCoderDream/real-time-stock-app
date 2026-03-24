@@ -2,6 +2,11 @@ import { InjectionToken } from '@angular/core';
 import { Observable } from 'rxjs';
 import { StockConfig, StockPriceUpdate } from './models/stock.model';
 
+export interface IStockPriceService {
+  prices$: Observable<StockPriceUpdate>;
+  notifyToggle(symbol: string, active: boolean): void;
+}
+
 export const TRACKED_STOCKS: StockConfig[] = [
   { symbol: 'AAPL', name: 'Apple' },
   { symbol: 'GOOGL', name: 'Alphabet' },
@@ -17,6 +22,6 @@ export const TRACKED_STOCKS: StockConfig[] = [
   { symbol: 'CRM', name: 'Salesforce' },
 ];
 
-export const STOCK_PRICE_STREAM = new InjectionToken<Observable<StockPriceUpdate>>(
+export const STOCK_PRICE_STREAM = new InjectionToken<IStockPriceService>(
   'StockPriceStream'
 );

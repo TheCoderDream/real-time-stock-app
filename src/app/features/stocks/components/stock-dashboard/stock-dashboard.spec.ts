@@ -13,13 +13,17 @@ describe('StockDashboard', () => {
   let priceSubject: Subject<StockPriceUpdate>;
 
   beforeEach(async () => {
+    localStorage.clear();
     priceSubject = new Subject<StockPriceUpdate>();
 
     await TestBed.configureTestingModule({
       imports: [StockDashboard],
       providers: [
         provideZonelessChangeDetection(),
-        { provide: STOCK_PRICE_STREAM, useValue: priceSubject.asObservable() },
+        {
+          provide: STOCK_PRICE_STREAM,
+          useValue: { prices$: priceSubject.asObservable(), notifyToggle: vi.fn() },
+        },
         {
           provide: StockApiService,
           useValue: { fetchAllStocks: () => throwError(() => new Error('mock error')) },

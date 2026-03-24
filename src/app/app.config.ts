@@ -21,12 +21,9 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     {
       provide: STOCK_PRICE_STREAM,
-      useFactory: () => {
-        const service = environment.useMock
-          ? inject(MockWebSocketService)
-          : inject(FinnhubWebSocketService);
-        return service.prices$;
-      },
+      useFactory: () => environment.useMock
+        ? inject(MockWebSocketService)
+        : inject(FinnhubWebSocketService),
     },
   ],
 };
